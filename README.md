@@ -5,14 +5,16 @@ Administradora Norte de Copiapó.
 
 ## Estado
 
-Prototipo navegable con datos ficticios. Esta versión todavía no se conecta a
-Supabase ni procesa archivos reales.
+Prototipo navegable con datos ficticios. Incluye el esquema inicial de
+Supabase, pero todavía no está enlazado a un proyecto remoto ni procesa archivos
+reales.
 
 ## Tecnologías
 
 - React
 - TypeScript
 - Vite
+- Supabase
 - Lucide Icons
 - PWA instalable
 
@@ -20,6 +22,7 @@ Supabase ni procesa archivos reales.
 
 ```bash
 npm install
+cp .env.example .env.local
 npm run dev
 ```
 
@@ -27,6 +30,7 @@ npm run dev
 
 ```bash
 npm run lint
+npm test
 npm run build
 ```
 
