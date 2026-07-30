@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { getAuthRedirectError } from "./authFeedback";
+import { getAuthRedirectError, getAuthRequestError } from "./authFeedback";
 
 describe("getAuthRedirectError", () => {
   it("explains expired single-use links", () => {
@@ -20,5 +20,19 @@ describe("getAuthRedirectError", () => {
 
   it("ignores ordinary URL fragments", () => {
     expect(getAuthRedirectError("#cargas-mensuales")).toBeNull();
+  });
+});
+
+describe("getAuthRequestError", () => {
+  it("explains the temporary email quota without exposing account existence", () => {
+    expect(getAuthRequestError("over_email_send_rate_limit")).toBe(
+      "Se alcanzó el límite temporal de correos de Supabase Free. Intenta nuevamente en una hora.",
+    );
+  });
+
+  it("keeps other request failures generic", () => {
+    expect(getAuthRequestError("user_not_found")).toBe(
+      "La cuenta no existe o no fue posible enviar el enlace.",
+    );
   });
 });

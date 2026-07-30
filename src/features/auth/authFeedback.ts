@@ -25,3 +25,21 @@ export function getAuthRedirectError(hash: string): string | null {
     "No fue posible completar el acceso. Solicita un enlace nuevo."
   );
 }
+
+/**
+ * Converts a passwordless-email request failure into safe user feedback.
+ *
+ * The generic response deliberately avoids confirming whether an address is
+ * registered, while operational rate limits can be explained without exposing
+ * account existence.
+ *
+ * @param errorCode - Stable Supabase Auth error code, when available.
+ * @returns A localized message suitable for the public access form.
+ */
+export function getAuthRequestError(errorCode?: string): string {
+  if (errorCode === "over_email_send_rate_limit") {
+    return "Se alcanzó el límite temporal de correos de Supabase Free. Intenta nuevamente en una hora.";
+  }
+
+  return "La cuenta no existe o no fue posible enviar el enlace.";
+}
