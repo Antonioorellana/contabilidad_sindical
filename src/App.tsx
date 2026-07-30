@@ -1,4 +1,4 @@
-import { useState, type ComponentType } from "react";
+import { useEffect, useRef, useState, type ComponentType } from "react";
 import {
   Activity,
   AlertTriangle,
@@ -135,6 +135,8 @@ function Application({ officer }: { officer: AuthenticatedOfficer }) {
   const [active, setActive] = useState("Inicio");
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [openUploadSignal, setOpenUploadSignal] = useState(0);
+  const [importSearch, setImportSearch] = useState("");
+  const searchInputRef = useRef<HTMLInputElement>(null);
   const initials = officer.displayName
     .split(/\s+/)
     .slice(0, 2)
@@ -142,6 +144,19 @@ function Application({ officer }: { officer: AuthenticatedOfficer }) {
     .join("")
     .toUpperCase();
   const roleLabel = officer.role === "treasurer" ? "Tesorería" : "Presidencia";
+
+  useEffect(() => {
+    const focusSearch = (event: KeyboardEvent) => {
+      if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === "k") {
+        event.preventDefault();
+        setActive("Cargas mensuales");
+        searchInputRef.current?.focus();
+      }
+    };
+
+    window.addEventListener("keydown", focusSearch);
+    return () => window.removeEventListener("keydown", focusSearch);
+  }, []);
 
   return (
     <div className="app-shell">
@@ -202,7 +217,16 @@ function Application({ officer }: { officer: AuthenticatedOfficer }) {
           </button>
           <div className="search">
             <Search size={18} />
-            <input aria-label="Buscar" placeholder="Buscar movimiento, socio o documento" />
+            <input
+              ref={searchInputRef}
+              aria-label="Buscar socio por RUT o nombre"
+              placeholder="Buscar RUT o nombre en cargas"
+              value={importSearch}
+              onChange={(event) => {
+                setImportSearch(event.target.value);
+                setActive("Cargas mensuales");
+              }}
+            />
             <kbd>⌘ K</kbd>
           </div>
           <div className="top-actions">
@@ -227,6 +251,8 @@ function Application({ officer }: { officer: AuthenticatedOfficer }) {
           <MonthlyImportsPage
             role={officer.role}
             openUploadSignal={openUploadSignal}
+            searchQuery={importSearch}
+            onSearchQueryChange={setImportSearch}
           />
         ) : (
           <div className="content">

@@ -5,6 +5,9 @@ export type SourceFileKind =
   | "bank_statement";
 
 export type ImportRecordType = "social_fee" | "agreement" | "unknown";
+export type ImportValidationStatus = "ready" | "manual_review";
+export type ImportReviewStatusFilter = "all" | ImportValidationStatus;
+export type ImportRecordTypeFilter = "all" | ImportRecordType;
 
 export interface MonthlyCycle {
   id: string;
@@ -40,6 +43,36 @@ export interface ImportBatchSummary {
     sha256: string;
     provider_id: string | null;
   } | null;
+}
+
+export interface StagedImportRow {
+  id: string;
+  sheet_name: string;
+  source_row_number: number;
+  source_name: string | null;
+  normalized_rut: string | null;
+  amount: number | null;
+  installment_number: number | null;
+  installment_count: number | null;
+  record_type: ImportRecordType;
+  validation_status: ImportValidationStatus;
+  issue_codes: string[];
+}
+
+export interface ImportReviewQuery {
+  batchId: string;
+  search: string;
+  status: ImportReviewStatusFilter;
+  recordType: ImportRecordTypeFilter;
+  page: number;
+  pageSize: number;
+}
+
+export interface ImportReviewPage {
+  rows: StagedImportRow[];
+  total: number;
+  page: number;
+  pageSize: number;
 }
 
 export interface StagedImportRowInput {

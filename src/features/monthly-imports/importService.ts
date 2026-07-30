@@ -6,6 +6,8 @@ import {
 } from "./fileIntegrity";
 import type {
   ImportBatchSummary,
+  ImportReviewPage,
+  ImportReviewQuery,
   MonthlyCycle,
   Provider,
   UploadRequest,
@@ -86,6 +88,109 @@ export async function loadMonthlyContext(cycleId?: string): Promise<MonthlyConte
     providers: (providersResult.data ?? []) as Provider[],
     batches: (batchesResult.data ?? []) as unknown as ImportBatchSummary[],
   };
+}
+
+/**
+ * Loads one page of prevalidated rows without creating accounting records.
+ *
+ * @param reviewQuery - Batch, search terms, filters and pagination boundaries.
+ * @returns Matching staged rows and their exact total.
+ */
+export async function loadImportReviewPage(
+  reviewQuery: ImportReviewQuery,
+): Promise<ImportReviewPage> {
+  const client = requireSupabase();
+  const page = Math.max(1, Math.trunc(reviewQuery.page));
+  const pageSize = Math.min(100, Math.max(10, Math.trunc(reviewQuery.pageSize)));
+  const from = (page - 1) * pageSize;
+  const to = from + pageSize - 1;
+
+  let rowsQuery = client
+    .from("staged_import_rows")
+    .select(
+      `
+        id,
+        sheet_name,
+        source_row_number,
+        source_name,
+        normalized_rut,
+        amount,
+        installment_number,
+        installment_count,
+        record_type,
+        validation_status,
+        issue_codes
+      `,
+      { count: "exact" },
+    )
+    .eq("batch_id", reviewQuery.batchId)
+    .order("sheet_name", { ascending: true })
+    .order("source_row_number", { ascending: true })
+    .range(from, to);
+
+  if (reviewQuery.status !== "all") {
+    rowsQuery = rowsQuery.eq("validation_status", reviewQuery.status);
+  }
+
+  if (reviewQuery.recordType !== "all") {
+    rowsQuery = rowsQuery.eq("record_type", reviewQuery.recordType);
+  }
+
+  const searchFilter = buildImportReviewSearchFilter(reviewQuery.search);
+  if (searchFilter) {
+    rowsQuery = rowsQuery.or(searchFilter);
+  }
+
+  const { data, error, count } = await rowsQuery;
+  if (error) {
+    throw new Error(`No fue posible consultar las filas: ${error.message}`);
+  }
+
+  return {
+    rows: data ?? [],
+    total: count ?? 0,
+    page,
+    pageSize,
+  };
+}
+
+/**
+ * Builds a safe PostgREST OR filter for a Chilean RUT or member name.
+ *
+ * @param rawSearch - User-provided search text.
+ * @returns A filter expression or an empty string when no searchable text remains.
+ */
+export function buildImportReviewSearchFilter(rawSearch: string): string {
+  const normalizedText = rawSearch
+    .normalize("NFKC")
+    .trim()
+    .slice(0, 80);
+
+  if (!normalizedText) {
+    return "";
+  }
+
+  const filters: string[] = [];
+  const safeName = normalizedText
+    .replace(/[^\p{L}\p{N}\s-]/gu, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+
+  if (safeName) {
+    filters.push(`source_name.ilike.%${safeName}%`);
+  }
+
+  const compactRut = normalizedText
+    .toUpperCase()
+    .replace(/[^0-9K]/g, "");
+
+  if (compactRut.length >= 2) {
+    const normalizedRut = `${compactRut.slice(0, -1)}-${compactRut.slice(-1)}`;
+    filters.push(`normalized_rut.ilike.%${compactRut}%`);
+    filters.push(`normalized_rut.ilike.%${normalizedRut}%`);
+  }
+
+  return filters.join(",");
 }
 
 /**
