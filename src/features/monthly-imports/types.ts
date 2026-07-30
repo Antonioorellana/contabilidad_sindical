@@ -71,6 +71,7 @@ export interface UploadRequest {
   providerId: string | null;
   kind: SourceFileKind;
   file: File;
+  sha256: string;
   parsed: ParsedImportFile;
 }
 

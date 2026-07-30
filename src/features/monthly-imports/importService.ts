@@ -1,6 +1,5 @@
 import { supabase } from "../../lib/supabase";
 import {
-  calculateSha256,
   getFileExtension,
   sanitizeFileName,
   validateImportFile,
@@ -19,6 +18,12 @@ interface MonthlyContext {
   cycles: MonthlyCycle[];
   providers: Provider[];
   batches: ImportBatchSummary[];
+}
+
+interface ExistingUpload {
+  sourceFileId: string;
+  batchId: string;
+  batchStatus: string;
 }
 
 /**
@@ -142,7 +147,11 @@ export async function uploadMonthlyFile(request: UploadRequest): Promise<UploadR
     throw new Error("Selecciona el convenio que envió la planilla.");
   }
 
-  const sha256 = await calculateSha256(request.file);
+  const sha256 = request.sha256;
+  if (!/^[a-f0-9]{64}$/.test(sha256)) {
+    throw new Error("La huella de integridad del archivo no es válida.");
+  }
+
   const providerSegment = request.providerId ?? "general";
   const storagePath = [
     request.cycle.discount_period,
@@ -152,16 +161,12 @@ export async function uploadMonthlyFile(request: UploadRequest): Promise<UploadR
   ].join("/");
   const mediaType = request.file.type || inferMediaType(request.file.name);
 
-  const { error: uploadError } = await client.storage
-    .from(PRIVATE_BUCKET)
-    .upload(storagePath, request.file, {
-      contentType: mediaType,
-      upsert: false,
-    });
-
-  if (uploadError) {
-    throw new Error(`No fue posible guardar el original: ${uploadError.message}`);
+  const existingUpload = await findExistingUpload(client, request, sha256);
+  if (existingUpload) {
+    return stageParsedRows(client, request, existingUpload);
   }
+
+  await storeOriginal(client, storagePath, request.file, mediaType, request, sha256);
 
   const { data: registrationData, error: registrationError } = await client.rpc(
     "register_monthly_source_file",
@@ -178,6 +183,11 @@ export async function uploadMonthlyFile(request: UploadRequest): Promise<UploadR
   );
 
   if (registrationError) {
+    const concurrentUpload = await findExistingUpload(client, request, sha256);
+    if (concurrentUpload) {
+      return stageParsedRows(client, request, concurrentUpload);
+    }
+
     await client.storage.from(PRIVATE_BUCKET).remove([storagePath]);
     throw new Error(`El archivo no pudo registrarse: ${registrationError.message}`);
   }
@@ -189,19 +199,148 @@ export async function uploadMonthlyFile(request: UploadRequest): Promise<UploadR
   const batchId = registration?.import_batch_id as string | undefined;
 
   if (!sourceFileId || !batchId) {
+    const recoveredUpload = await findExistingUpload(client, request, sha256);
+    if (recoveredUpload) {
+      return stageParsedRows(client, request, recoveredUpload);
+    }
+
+    await client.storage.from(PRIVATE_BUCKET).remove([storagePath]);
     throw new Error("La base de datos no devolvió los identificadores de la carga.");
   }
 
+  return stageParsedRows(client, request, {
+    sourceFileId,
+    batchId,
+    batchStatus: "uploaded",
+  });
+}
+
+async function storeOriginal(
+  client: ReturnType<typeof requireSupabase>,
+  storagePath: string,
+  file: File,
+  mediaType: string,
+  request: UploadRequest,
+  sha256: string,
+): Promise<void> {
+  const upload = () =>
+    client.storage.from(PRIVATE_BUCKET).upload(storagePath, file, {
+      contentType: mediaType,
+      upsert: false,
+    });
+
+  const { error: uploadError } = await upload();
+  if (!uploadError) {
+    return;
+  }
+
+  if (!isStorageConflict(uploadError)) {
+    throw new Error(`No fue posible guardar el original: ${uploadError.message}`);
+  }
+
+  const registeredUpload = await findExistingUpload(client, request, sha256);
+  if (registeredUpload) {
+    return;
+  }
+
+  const { error: cleanupError } = await client.storage
+    .from(PRIVATE_BUCKET)
+    .remove([storagePath]);
+
+  if (cleanupError) {
+    throw new Error(
+      "Existe una carga incompleta del mismo archivo y no fue posible recuperarla automáticamente.",
+    );
+  }
+
+  const { error: retryError } = await upload();
+  if (retryError) {
+    throw new Error(`No fue posible guardar el original: ${retryError.message}`);
+  }
+}
+
+async function findExistingUpload(
+  client: ReturnType<typeof requireSupabase>,
+  request: UploadRequest,
+  sha256: string,
+): Promise<ExistingUpload | null> {
+  let sourceQuery = client
+    .from("source_files")
+    .select("id")
+    .eq("cycle_id", request.cycle.id)
+    .eq("kind", request.kind)
+    .eq("sha256", sha256);
+
+  sourceQuery = request.providerId
+    ? sourceQuery.eq("provider_id", request.providerId)
+    : sourceQuery.is("provider_id", null);
+
+  const { data: sourceFile, error: sourceError } = await sourceQuery.maybeSingle();
+  if (sourceError) {
+    throw new Error(`No fue posible revisar cargas anteriores: ${sourceError.message}`);
+  }
+  if (!sourceFile) {
+    return null;
+  }
+
+  const { data: batch, error: batchError } = await client
+    .from("import_batches")
+    .select("id,status")
+    .eq("source_file_id", sourceFile.id)
+    .maybeSingle();
+
+  if (batchError) {
+    throw new Error(`No fue posible revisar la prevalidación existente: ${batchError.message}`);
+  }
+  if (!batch) {
+    throw new Error(
+      "El original ya está registrado, pero su prevalidación requiere reparación manual.",
+    );
+  }
+
+  return {
+    sourceFileId: sourceFile.id,
+    batchId: batch.id,
+    batchStatus: batch.status,
+  };
+}
+
+async function stageParsedRows(
+  client: ReturnType<typeof requireSupabase>,
+  request: UploadRequest,
+  upload: ExistingUpload,
+): Promise<UploadResult> {
   if (!request.parsed.canProcess) {
     return {
-      sourceFileId,
-      batchId,
+      sourceFileId: upload.sourceFileId,
+      batchId: upload.batchId,
       archivedOnly: true,
     };
   }
 
+  if (
+    upload.batchStatus === "processed" ||
+    upload.batchStatus === "superseded"
+  ) {
+    return {
+      sourceFileId: upload.sourceFileId,
+      batchId: upload.batchId,
+      archivedOnly: false,
+    };
+  }
+
+  if (upload.batchStatus === "processing") {
+    throw new Error(
+      "Este archivo ya se está prevalidando. Espera unos segundos y actualiza la pantalla.",
+    );
+  }
+
+  if (upload.batchStatus !== "uploaded" && upload.batchStatus !== "failed") {
+    throw new Error("La carga existente tiene un estado que requiere revisión manual.");
+  }
+
   const { error: ingestError } = await client.rpc("ingest_staged_import_rows", {
-    p_import_batch_id: batchId,
+    p_import_batch_id: upload.batchId,
     p_rows: request.parsed.rows,
   });
 
@@ -212,10 +351,29 @@ export async function uploadMonthlyFile(request: UploadRequest): Promise<UploadR
   }
 
   return {
-    sourceFileId,
-    batchId,
+    sourceFileId: upload.sourceFileId,
+    batchId: upload.batchId,
     archivedOnly: false,
   };
+}
+
+export function isStorageConflict(error: unknown): boolean {
+  if (!error || typeof error !== "object") {
+    return false;
+  }
+
+  const storageError = error as { message?: unknown; statusCode?: unknown };
+  const statusCode = Number(storageError.statusCode);
+  const message =
+    typeof storageError.message === "string"
+      ? storageError.message.toLowerCase()
+      : "";
+
+  return (
+    statusCode === 409 ||
+    message.includes("already exists") ||
+    message.includes("duplicate")
+  );
 }
 
 function requireSupabase() {
