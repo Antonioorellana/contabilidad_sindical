@@ -4,6 +4,7 @@ import {
   CalendarDays,
   CheckCircle2,
   FileSpreadsheet,
+  ListFilter,
   LoaderCircle,
   LockKeyhole,
   Plus,
@@ -11,6 +12,7 @@ import {
 } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
 import type { OfficerRole } from "../auth/useAuth";
+import { ImportReviewPanel } from "./ImportReviewPanel";
 import { createMonthlyCycle, loadMonthlyContext } from "./importService";
 import type {
   ImportBatchSummary,
@@ -22,6 +24,8 @@ import { UploadDialog } from "./UploadDialog";
 interface MonthlyImportsPageProps {
   role: OfficerRole;
   openUploadSignal: number;
+  searchQuery: string;
+  onSearchQueryChange: (search: string) => void;
 }
 
 const money = new Intl.NumberFormat("es-CL", {
@@ -39,11 +43,14 @@ const money = new Intl.NumberFormat("es-CL", {
 export function MonthlyImportsPage({
   role,
   openUploadSignal,
+  searchQuery,
+  onSearchQueryChange,
 }: MonthlyImportsPageProps) {
   const [cycles, setCycles] = useState<MonthlyCycle[]>([]);
   const [providers, setProviders] = useState<Provider[]>([]);
   const [batches, setBatches] = useState<ImportBatchSummary[]>([]);
   const [selectedCycleId, setSelectedCycleId] = useState("");
+  const [selectedBatchId, setSelectedBatchId] = useState("");
   const [isLoading, setIsLoading] = useState(true);
   const [isCreatingCycle, setIsCreatingCycle] = useState(false);
   const [isUploadOpen, setIsUploadOpen] = useState(false);
@@ -60,6 +67,14 @@ export function MonthlyImportsPage({
       setProviders(context.providers);
       setBatches(context.batches);
       setSelectedCycleId((current) => current || context.cycles[0]?.id || "");
+      setSelectedBatchId((current) => {
+        const remainsAvailable = context.batches.some(
+          (batch) => batch.id === current && batch.detected_rows > 0,
+        );
+        return remainsAvailable
+          ? current
+          : context.batches.find((batch) => batch.detected_rows > 0)?.id ?? "";
+      });
     } catch (caughtError) {
       setError(toErrorMessage(caughtError));
     } finally {
@@ -102,6 +117,14 @@ export function MonthlyImportsPage({
     (total, batch) => total + (batch.detected_total ?? 0),
     0,
   );
+  const openBatchReview = (batchId: string) => {
+    setSelectedBatchId(batchId);
+    window.requestAnimationFrame(() => {
+      document
+        .getElementById("revision-carga")
+        ?.scrollIntoView({ behavior: "smooth", block: "start" });
+    });
+  };
 
   return (
     <div className="content imports-content">
@@ -246,11 +269,24 @@ export function MonthlyImportsPage({
         ) : (
           <div className="import-list">
             {batches.map((batch) => (
-              <ImportBatchRow key={batch.id} batch={batch} />
+              <ImportBatchRow
+                key={batch.id}
+                batch={batch}
+                isSelected={batch.id === selectedBatchId}
+                onReview={openBatchReview}
+              />
             ))}
           </div>
         )}
       </section>
+
+      <ImportReviewPanel
+        batches={batches}
+        selectedBatchId={selectedBatchId}
+        search={searchQuery}
+        onBatchChange={setSelectedBatchId}
+        onSearchChange={onSearchQueryChange}
+      />
 
       {isUploadOpen && selectedCycle ? (
         <UploadDialog
@@ -264,12 +300,20 @@ export function MonthlyImportsPage({
   );
 }
 
-function ImportBatchRow({ batch }: { batch: ImportBatchSummary }) {
+function ImportBatchRow({
+  batch,
+  isSelected,
+  onReview,
+}: {
+  batch: ImportBatchSummary;
+  isSelected: boolean;
+  onReview: (batchId: string) => void;
+}) {
   const source = batch.source_files;
   const archivedOnly = batch.status === "uploaded" && batch.detected_rows === 0;
 
   return (
-    <article className="import-row">
+    <article className={`import-row ${isSelected ? "selected" : ""}`}>
       <span className={`file-icon ${batch.rejected_rows > 0 ? "warning" : ""}`}>
         {archivedOnly ? <Archive size={18} /> : <FileSpreadsheet size={18} />}
       </span>
@@ -289,13 +333,25 @@ function ImportBatchRow({ batch }: { batch: ImportBatchSummary }) {
           {batch.rejected_rows}
         </strong>
       </div>
-      <span className={`batch-status ${batch.rejected_rows > 0 ? "review" : "safe"}`}>
-        {archivedOnly
-          ? "Archivado"
-          : batch.rejected_rows > 0
-            ? "Revisión manual"
-            : "Prevalidado"}
-      </span>
+      <div className="batch-actions">
+        <span className={`batch-status ${batch.rejected_rows > 0 ? "review" : "safe"}`}>
+          {archivedOnly
+            ? "Archivado"
+            : batch.rejected_rows > 0
+              ? "Revisión manual"
+              : "Prevalidado"}
+        </span>
+        {!archivedOnly ? (
+          <button
+            className="review-link"
+            type="button"
+            onClick={() => onReview(batch.id)}
+          >
+            <ListFilter size={15} />
+            Ver filas
+          </button>
+        ) : null}
+      </div>
     </article>
   );
 }

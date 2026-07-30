@@ -1,5 +1,8 @@
 import { describe, expect, it } from "vitest";
-import { isStorageConflict } from "./importService";
+import {
+  buildImportReviewSearchFilter,
+  isStorageConflict,
+} from "./importService";
 
 describe("isStorageConflict", () => {
   it("reconoce el estado de conflicto de Supabase Storage", () => {
@@ -18,5 +21,23 @@ describe("isStorageConflict", () => {
     expect(isStorageConflict({ statusCode: 500, message: "Network error" })).toBe(
       false,
     );
+  });
+});
+
+describe("buildImportReviewSearchFilter", () => {
+  it("normaliza un RUT con puntos para buscar el valor almacenado", () => {
+    expect(buildImportReviewSearchFilter("12.345.678-9")).toContain(
+      "normalized_rut.ilike.%12345678-9%",
+    );
+  });
+
+  it("conserva nombres y elimina operadores de PostgREST", () => {
+    expect(buildImportReviewSearchFilter("  María,(Pérez)%  ")).toBe(
+      "source_name.ilike.%María Pérez%",
+    );
+  });
+
+  it("no genera filtros para una búsqueda vacía", () => {
+    expect(buildImportReviewSearchFilter("   ")).toBe("");
   });
 });
