@@ -28,6 +28,7 @@ import {
   WalletCards,
   X,
 } from "lucide-react";
+import { publicEnvironment } from "./lib/env";
 
 type Icon = ComponentType<{ size?: number; strokeWidth?: number }>;
 type Tone = "blue" | "teal" | "amber" | "rose";
@@ -186,7 +187,16 @@ function App() {
             <kbd>⌘ K</kbd>
           </div>
           <div className="top-actions">
-            <div className="connection-status"><span /> En línea</div>
+            <div
+              className={`connection-status ${
+                publicEnvironment.isSupabaseConfigured ? "" : "not-configured"
+              }`}
+            >
+              <span />
+              {publicEnvironment.isSupabaseConfigured
+                ? "Supabase conectado"
+                : "Modo prototipo"}
+            </div>
             <button className="profile" aria-label="Abrir perfil de Patricio, Tesorería">
               <span>PT</span>
               <div><strong>Patricio</strong><small>Tesorería</small></div>
