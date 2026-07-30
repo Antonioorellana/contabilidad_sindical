@@ -46,10 +46,14 @@ export function useAuth(): AuthState {
 
     const client = supabase;
     let isCurrent = true;
+    let resolutionId = 0;
+    const pendingResolutions = new Set<ReturnType<typeof setTimeout>>();
 
     const resolveOfficer = async (session: Session | null) => {
+      const currentResolutionId = ++resolutionId;
+
       if (!session) {
-        if (isCurrent) {
+        if (isCurrent && currentResolutionId === resolutionId) {
           setState({
             isLoading: false,
             session: null,
@@ -75,7 +79,7 @@ export function useAuth(): AuthState {
           .or(`ends_on.is.null,ends_on.gte.${today}`),
       ]);
 
-      if (!isCurrent) {
+      if (!isCurrent || currentResolutionId !== resolutionId) {
         return;
       }
 
@@ -137,11 +141,19 @@ export function useAuth(): AuthState {
     const {
       data: { subscription },
     } = client.auth.onAuthStateChange((_event, session) => {
-      void resolveOfficer(session);
+      // Supabase holds an authentication lock while this callback runs.
+      // Defer database queries so the sign-in transaction can finish first.
+      const timeout = setTimeout(() => {
+        pendingResolutions.delete(timeout);
+        void resolveOfficer(session);
+      }, 0);
+      pendingResolutions.add(timeout);
     });
 
     return () => {
       isCurrent = false;
+      pendingResolutions.forEach(clearTimeout);
+      pendingResolutions.clear();
       subscription.unsubscribe();
     };
   }, []);
