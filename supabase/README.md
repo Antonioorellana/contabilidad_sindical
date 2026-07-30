@@ -20,13 +20,16 @@ manualmente mediante SQL Editor. Antes del primer `supabase db push` debe
 repararse el historial del CLI para marcarlas como aplicadas y evitar que se
 intenten ejecutar por segunda vez.
 
-Pendientes de bootstrap:
+Bootstrap completado:
 
-1. Crear manualmente la primera cuenta de tesorería.
-2. Insertar su perfil y asignación de cargo usando el UUID de Supabase Auth.
-3. Crear la cuenta separada de presidencia cuando corresponda.
-4. Verificar URL de sitio y redirecciones de autenticación para producción.
-5. Enlazar el proyecto mediante Supabase CLI y reparar el historial:
+- Primera cuenta de tesorería confirmada administrativamente.
+- Perfil `sindicato` activo desde el 1 de julio de 2026.
+- URL productiva y redirecciones exactas configuradas.
+
+Pendientes:
+
+1. Crear la cuenta separada de presidencia cuando corresponda.
+2. Enlazar el proyecto mediante Supabase CLI y reparar el historial:
 
    ```bash
    supabase link --project-ref TU_PROJECT_REF
