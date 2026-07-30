@@ -327,7 +327,7 @@ declare
   row_issues text[];
   requested_issues jsonb;
   row_status text;
-  error_summary jsonb;
+  aggregated_error_summary jsonb;
 begin
   if not private.has_active_role('treasurer'::public.app_role) then
     raise exception 'Solo tesorería puede procesar archivos mensuales';
@@ -539,7 +539,7 @@ begin
     )
     order by issue_code
   )
-  into error_summary
+  into aggregated_error_summary
   from (
     select issue_code, count(*)::integer as issue_count
     from public.staged_import_rows staged,
@@ -548,7 +548,10 @@ begin
     group by issue_code
   ) grouped_issues;
 
-  error_summary := coalesce(error_summary, '[]'::jsonb);
+  aggregated_error_summary := coalesce(
+    aggregated_error_summary,
+    '[]'::jsonb
+  );
 
   update public.import_batches
   set
@@ -562,7 +565,7 @@ begin
       where staged.batch_id = p_import_batch_id
         and staged.amount is not null
     ),
-    error_summary = error_summary,
+    error_summary = aggregated_error_summary,
     processed_by = auth.uid(),
     processed_at = now()
   where id = p_import_batch_id
@@ -593,7 +596,7 @@ begin
         'review_rows',
         review_count,
         'issues',
-        error_summary
+        aggregated_error_summary
       )
     );
 
