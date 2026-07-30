@@ -67,4 +67,19 @@ describe("parseImportFile", () => {
     expect(result.rows[0].amount).toBeNull();
     expect(result.rows[0].issues).toContain("missing_or_invalid_amount");
   });
+
+  it("excluye la celda final que repite exactamente el total de la hoja", async () => {
+    const csv = [
+      "RUT;nombre;ITEM;MONTO",
+      "12.345.678-5;Persona Uno;CAPUAL;10000",
+      "11.111.111-1;Persona Dos;Óptica;20000",
+      ";;;30000",
+    ].join("\n");
+    const file = new File([csv], "resultado.csv", { type: "text/csv" });
+
+    const result = await parseImportFile(file, "company_result");
+
+    expect(result.rows).toHaveLength(2);
+    expect(result.detectedTotal).toBe(30_000);
+  });
 });

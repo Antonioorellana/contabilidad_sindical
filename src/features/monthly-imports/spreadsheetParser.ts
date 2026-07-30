@@ -114,6 +114,12 @@ function normalizeSheet(
   }
 
   const rows: StagedImportRowInput[] = [];
+  const lastDataRowIndex = findLastDataRowIndex(
+    sheet.data,
+    header.rowIndex + 1,
+  );
+  let sheetSubtotal = 0;
+
   for (let index = header.rowIndex + 1; index < sheet.data.length; index += 1) {
     const sourceRow = sheet.data[index];
     if (isEmptyRow(sourceRow)) {
@@ -122,6 +128,14 @@ function normalizeSheet(
 
     const rut = toText(sourceRow[header.columns.rut]);
     const amount = toIntegerMoney(sourceRow[header.columns.amount]);
+    if (
+      index === lastDataRowIndex &&
+      amount === sheetSubtotal &&
+      isAmountOnlyRow(sourceRow, header.columns.amount)
+    ) {
+      continue;
+    }
+
     const category = valueAt(sourceRow, header.columns.category);
     const recordType = classifyRecordType(kind, category, amount);
     const issues: string[] = [];
@@ -151,6 +165,10 @@ function normalizeSheet(
       reference: valueAt(sourceRow, header.columns.reference),
       issues,
     });
+
+    if (amount !== null) {
+      sheetSubtotal += amount;
+    }
   }
 
   return rows;
@@ -369,6 +387,23 @@ function cellAt(row: Cell[], index: number | null): Cell | undefined {
 
 function isEmptyRow(row: Cell[]): boolean {
   return row.every((cell) => cell === null || String(cell).trim() === "");
+}
+
+function findLastDataRowIndex(data: Cell[][], fromIndex: number): number {
+  for (let index = data.length - 1; index >= fromIndex; index -= 1) {
+    if (!isEmptyRow(data[index])) {
+      return index;
+    }
+  }
+
+  return -1;
+}
+
+function isAmountOnlyRow(row: Cell[], amountIndex: number): boolean {
+  return row.every(
+    (cell, index) =>
+      index === amountIndex || cell === null || String(cell).trim() === "",
+  );
 }
 
 function archiveOnly(notice: string): ParsedImportFile {

@@ -32,6 +32,7 @@ import {
 import { AuthGate } from "./features/auth/AuthGate";
 import type { AuthenticatedOfficer } from "./features/auth/useAuth";
 import { MonthlyImportsPage } from "./features/monthly-imports/MonthlyImportsPage";
+import { ReconciliationPage } from "./features/reconciliation/ReconciliationPage";
 import { supabase } from "./lib/supabase";
 
 type Icon = ComponentType<{ size?: number; strokeWidth?: number }>;
@@ -254,6 +255,11 @@ function Application({ officer }: { officer: AuthenticatedOfficer }) {
             searchQuery={importSearch}
             onSearchQueryChange={setImportSearch}
           />
+        ) : active === "Conciliación" ? (
+          <ReconciliationPage
+            role={officer.role}
+            onOpenImports={() => setActive("Cargas mensuales")}
+          />
         ) : (
           <div className="content">
           <section className="page-heading">
@@ -329,7 +335,12 @@ function Application({ officer }: { officer: AuthenticatedOfficer }) {
                   <span className="eyebrow">Cruce automático</span>
                   <h2>Conciliación del periodo</h2>
                 </div>
-                <button className="text-button">Ver detalle <ArrowUpRight size={16} /></button>
+                <button
+                  className="text-button"
+                  onClick={() => setActive("Conciliación")}
+                >
+                  Ver detalle <ArrowUpRight size={16} />
+                </button>
               </div>
               <div className="table-head">
                 <span>Concepto</span><span>Solicitado</span><span>Informado</span><span>Estado</span>
