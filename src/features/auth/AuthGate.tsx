@@ -1,6 +1,13 @@
-import { useState, type FormEvent, type ReactNode } from "react";
-import { KeyRound, LoaderCircle, LogOut, Mail, ShieldCheck } from "lucide-react";
+import { useEffect, useState, type FormEvent, type ReactNode } from "react";
+import {
+  KeyRound,
+  LoaderCircle,
+  LogOut,
+  Mail,
+  ShieldCheck,
+} from "lucide-react";
 import { supabase } from "../../lib/supabase";
+import { getAuthRedirectError } from "./authFeedback";
 import { useAuth, type AuthenticatedOfficer } from "./useAuth";
 
 interface AuthGateProps {
@@ -16,16 +23,30 @@ interface AuthGateProps {
 export function AuthGate({ children }: AuthGateProps) {
   const auth = useAuth();
   const [email, setEmail] = useState("");
-  const [isSending, setIsSending] = useState(false);
-  const [message, setMessage] = useState<string | null>(null);
+  const [isWorking, setIsWorking] = useState(false);
+  const [message, setMessage] = useState<string | null>(() =>
+    getAuthRedirectError(window.location.hash),
+  );
 
-  const requestAccessLink = async (event: FormEvent<HTMLFormElement>) => {
-    event.preventDefault();
-    if (!supabase || isSending) {
+  useEffect(() => {
+    if (!window.location.hash.includes("error_code=")) {
       return;
     }
 
-    setIsSending(true);
+    window.history.replaceState(
+      {},
+      document.title,
+      `${window.location.pathname}${window.location.search}`,
+    );
+  }, []);
+
+  const requestAccessLink = async (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    if (!supabase || isWorking) {
+      return;
+    }
+
+    setIsWorking(true);
     setMessage(null);
 
     const { error } = await supabase.auth.signInWithOtp({
@@ -36,11 +57,15 @@ export function AuthGate({ children }: AuthGateProps) {
       },
     });
 
-    setIsSending(false);
+    setIsWorking(false);
+
+    if (error) {
+      setMessage("La cuenta no existe o no fue posible enviar el enlace.");
+      return;
+    }
+
     setMessage(
-      error
-        ? "La cuenta no existe o no fue posible enviar el enlace."
-        : "Revisa tu correo. El enlace de acceso vence automáticamente.",
+      "Revisa tu correo y abre el enlace una sola vez. Vence automáticamente.",
     );
   };
 
@@ -109,8 +134,12 @@ export function AuthGate({ children }: AuthGateProps) {
               required
             />
           </div>
-          <button className="primary-button" type="submit" disabled={isSending}>
-            {isSending ? <LoaderCircle className="spin" size={18} /> : <KeyRound size={18} />}
+          <button className="primary-button" type="submit" disabled={isWorking}>
+            {isWorking ? (
+              <LoaderCircle className="spin" size={18} />
+            ) : (
+              <KeyRound size={18} />
+            )}
             Enviar enlace seguro
           </button>
         </form>
@@ -119,8 +148,8 @@ export function AuthGate({ children }: AuthGateProps) {
 
         <div className="privacy-note">
           <ShieldCheck size={17} />
-          El enlace no crea usuarios nuevos y la autorización se valida nuevamente
-          en la base de datos.
+          El enlace no crea usuarios nuevos, solo puede usarse una vez y la
+          autorización se valida nuevamente en la base de datos.
         </div>
       </section>
     </div>

@@ -21,16 +21,19 @@
    before parsing or normalizing its rows.
 
 ## Security & Privacy
-1. **[2026-07-29] Never commit Supabase secrets**
+1. **[2026-07-30] Defer work triggered by Supabase auth events**
+   Do instead: schedule profile and role queries after `onAuthStateChange`
+   returns so the authentication lock can finish persisting the session.
+2. **[2026-07-29] Never commit Supabase secrets**
    Do instead: commit only `.env.example`; configure real values in local
    environment and Vercel encrypted variables.
-2. **[2026-07-29] Keep financial writes online**
+3. **[2026-07-29] Keep financial writes online**
    Do instead: permit offline caches only for read-only views; require a live,
    authenticated server transaction for writes, approvals and reversals.
-3. **[2026-07-29] Default to least privilege**
+4. **[2026-07-29] Default to least privilege**
    Do instead: use role-based access plus PostgreSQL RLS and keep Storage
    buckets private.
-4. **[2026-07-29] Treat third-party spreadsheets as untrusted input**
+5. **[2026-07-29] Treat third-party spreadsheets as untrusted input**
    Do instead: use the read-only `read-excel-file` parser, cap files at 25 MB
    and 5,000 rows, and keep ambiguous rows in staging. Do not reintroduce
    ExcelJS while its production dependency chain reports high vulnerabilities.
