@@ -15,10 +15,10 @@ El proyecto remoto Free está operativo en la región `sa-east-1`.
 
 ## Estado del proyecto remoto
 
-Las migraciones `202607290001`, `202607290002` y `202607290003` se aplicaron
-manualmente mediante SQL Editor. Antes del primer `supabase db push` debe
-repararse el historial del CLI para marcarlas como aplicadas y evitar que se
-intenten ejecutar por segunda vez.
+Las migraciones `202607290001`, `202607290002`, `202607290003` y
+`202607300001` se aplicaron manualmente mediante SQL Editor. Antes del primer
+`supabase db push` debe repararse el historial del CLI para marcarlas como
+aplicadas y evitar que se intenten ejecutar por segunda vez.
 
 Bootstrap completado:
 
@@ -36,6 +36,7 @@ Pendientes:
    supabase migration repair 202607290001 --status applied
    supabase migration repair 202607290002 --status applied
    supabase migration repair 202607290003 --status applied
+   supabase migration repair 202607300001 --status applied
    ```
 
 Las variables públicas ya están configuradas localmente y en Vercel. No deben

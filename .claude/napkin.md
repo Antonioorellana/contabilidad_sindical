@@ -56,9 +56,9 @@
    Do instead: run lint, TypeScript build, production dependency audit and a
    browser smoke test before publishing.
 6. **[2026-07-29] Repair migration history before the first CLI push**
-   Do instead: mark `202607290001`, `202607290002` and `202607290003` as
-   applied when linking the Supabase CLI because they were executed manually
-   in the SQL Editor.
+   Do instead: mark `202607290001`, `202607290002`, `202607290003` and
+   `202607300001` as applied when linking the Supabase CLI because they were
+   executed manually in the SQL Editor.
 7. **[2026-07-29] Ignore stale inherited GitHub tokens**
    Do instead: run GitHub operations with empty `GH_TOKEN` and `GITHUB_TOKEN`
    so the authenticated keyring credential is used.
