@@ -18,6 +18,7 @@ import {
   FolderLock,
   Handshake,
   LayoutDashboard,
+  LogOut,
   Menu,
   ReceiptText,
   Search,
@@ -28,7 +29,10 @@ import {
   WalletCards,
   X,
 } from "lucide-react";
-import { publicEnvironment } from "./lib/env";
+import { AuthGate } from "./features/auth/AuthGate";
+import type { AuthenticatedOfficer } from "./features/auth/useAuth";
+import { MonthlyImportsPage } from "./features/monthly-imports/MonthlyImportsPage";
+import { supabase } from "./lib/supabase";
 
 type Icon = ComponentType<{ size?: number; strokeWidth?: number }>;
 type Tone = "blue" | "teal" | "amber" | "rose";
@@ -120,9 +124,24 @@ const activities = [
 ];
 
 function App() {
+  return (
+    <AuthGate>
+      {(officer) => <Application officer={officer} />}
+    </AuthGate>
+  );
+}
+
+function Application({ officer }: { officer: AuthenticatedOfficer }) {
   const [active, setActive] = useState("Inicio");
   const [sidebarOpen, setSidebarOpen] = useState(false);
-  const [uploadOpen, setUploadOpen] = useState(false);
+  const [openUploadSignal, setOpenUploadSignal] = useState(0);
+  const initials = officer.displayName
+    .split(/\s+/)
+    .slice(0, 2)
+    .map((part) => part[0])
+    .join("")
+    .toUpperCase();
+  const roleLabel = officer.role === "treasurer" ? "Tesorería" : "Presidencia";
 
   return (
     <div className="app-shell">
@@ -187,32 +206,44 @@ function App() {
             <kbd>⌘ K</kbd>
           </div>
           <div className="top-actions">
-            <div
-              className={`connection-status ${
-                publicEnvironment.isSupabaseConfigured ? "" : "not-configured"
-              }`}
-            >
+            <div className="connection-status">
               <span />
-              {publicEnvironment.isSupabaseConfigured
-                ? "Supabase conectado"
-                : "Modo prototipo"}
+              Sesión protegida
             </div>
-            <button className="profile" aria-label="Abrir perfil de Patricio, Tesorería">
-              <span>PT</span>
-              <div><strong>Patricio</strong><small>Tesorería</small></div>
-              <ChevronDown size={16} />
+            <button
+              className="profile"
+              aria-label={`Cerrar sesión de ${officer.displayName}`}
+              onClick={() => void supabase?.auth.signOut()}
+              title="Cerrar sesión"
+            >
+              <span>{initials}</span>
+              <div><strong>{officer.displayName}</strong><small>{roleLabel}</small></div>
+              <LogOut size={16} />
             </button>
           </div>
         </header>
 
-        <div className="content">
+        {active === "Cargas mensuales" ? (
+          <MonthlyImportsPage
+            role={officer.role}
+            openUploadSignal={openUploadSignal}
+          />
+        ) : (
+          <div className="content">
           <section className="page-heading">
             <div>
               <div className="eyebrow">Resumen operativo</div>
-              <h1>Buenos días, Tesorería</h1>
+              <h1>Buenos días, {roleLabel}</h1>
               <p>Todo lo necesario para completar el ciclo mensual, en un solo lugar.</p>
             </div>
-            <button className="primary-button" onClick={() => setUploadOpen(true)}>
+            <button
+              className="primary-button"
+              onClick={() => {
+                setActive("Cargas mensuales");
+                setOpenUploadSignal((current) => current + 1);
+              }}
+              disabled={officer.role !== "treasurer"}
+            >
               <Upload size={18} />
               Cargar archivos
             </button>
@@ -347,34 +378,9 @@ function App() {
               <div className="deadline-foot"><CheckCircle2 size={17} /> Archivo preparado y validado</div>
             </section>
           </div>
-        </div>
+          </div>
+        )}
       </main>
-
-      {uploadOpen && (
-        <div className="modal-layer" role="dialog" aria-modal="true" aria-labelledby="upload-title">
-          <button className="modal-scrim" onClick={() => setUploadOpen(false)} />
-          <section className="upload-modal glass">
-            <div className="modal-heading">
-              <div><span className="eyebrow">Julio 2026</span><h2 id="upload-title">Cargar archivos del periodo</h2></div>
-              <button
-                className="icon-button"
-                aria-label="Cerrar carga de archivos"
-                onClick={() => setUploadOpen(false)}
-              >
-                <X size={20} />
-              </button>
-            </div>
-            <p>Selecciona el origen. Conservaremos el archivo original y calcularemos su huella de integridad.</p>
-            <div className="upload-options">
-              <UploadOption icon={Handshake} title="Planilla de proveedor" detail="CAPUAL, Clínica Rimo u Óptica Joval" />
-              <UploadOption icon={FileSpreadsheet} title="FUNS enviado" detail="Archivo oficial remitido a la empresa" />
-              <UploadOption icon={Building2} title="Resultado de la empresa" detail="Cuota social y descuentos consolidados" />
-              <UploadOption icon={ReceiptText} title="Cartola bancaria" detail="Excel, CSV o PDF de Scotiabank" />
-            </div>
-            <div className="privacy-note"><ShieldCheck size={17} /> Los archivos todavía no se enviarán a ningún servidor en este prototipo.</div>
-          </section>
-        </div>
-      )}
     </div>
   );
 }
@@ -395,16 +401,6 @@ function ProcessStep({
       <span className="step-icon">{state === "done" ? <Check size={19} /> : <StepIcon size={19} />}</span>
       <div><strong>{title}</strong><span>{detail}</span></div>
     </div>
-  );
-}
-
-function UploadOption({ icon: OptionIcon, title, detail }: { icon: Icon; title: string; detail: string }) {
-  return (
-    <button className="upload-option">
-      <span className="icon-well blue"><OptionIcon size={20} /></span>
-      <span><strong>{title}</strong><small>{detail}</small></span>
-      <Upload size={18} />
-    </button>
   );
 }
 

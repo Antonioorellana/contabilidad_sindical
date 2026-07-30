@@ -1,7 +1,7 @@
 # Supabase
 
 Esta carpeta contiene la configuración local y las migraciones versionadas.
-Todavía no está enlazada a un proyecto remoto.
+El proyecto remoto Free está operativo en la región `sa-east-1`.
 
 ## Arquitectura de seguridad
 
@@ -13,24 +13,30 @@ Todavía no está enlazada a un proyecto remoto.
 - Los archivos originales no admiten actualización ni eliminación.
 - Las aprobaciones de presidencia se ejecutan mediante funciones controladas.
 
-## Preparación del proyecto remoto
+## Estado del proyecto remoto
 
-1. Crear un proyecto Supabase Free.
-2. Elegir una región y registrar formalmente dónde se alojarán los datos.
-3. Desactivar el registro público de usuarios.
-4. Enlazar el proyecto mediante Supabase CLI.
-5. Aplicar las migraciones:
+Las migraciones `202607290001`, `202607290002` y `202607290003` se aplicaron
+manualmente mediante SQL Editor. Antes del primer `supabase db push` debe
+repararse el historial del CLI para marcarlas como aplicadas y evitar que se
+intenten ejecutar por segunda vez.
+
+Pendientes de bootstrap:
+
+1. Crear manualmente la primera cuenta de tesorería.
+2. Insertar su perfil y asignación de cargo usando el UUID de Supabase Auth.
+3. Crear la cuenta separada de presidencia cuando corresponda.
+4. Verificar URL de sitio y redirecciones de autenticación para producción.
+5. Enlazar el proyecto mediante Supabase CLI y reparar el historial:
 
    ```bash
    supabase link --project-ref TU_PROJECT_REF
-   supabase db push
+   supabase migration repair 202607290001 --status applied
+   supabase migration repair 202607290002 --status applied
+   supabase migration repair 202607290003 --status applied
    ```
 
-6. Crear manualmente las primeras cuentas de tesorería y presidencia.
-7. Insertar sus perfiles y asignaciones de cargo utilizando SQL Editor con los
-   UUID generados por Supabase Auth.
-8. Configurar las variables públicas en `.env.local` y posteriormente en
-   Vercel.
+Las variables públicas ya están configuradas localmente y en Vercel. No deben
+documentarse ni versionarse sus valores.
 
 ## Inicio de roles
 
