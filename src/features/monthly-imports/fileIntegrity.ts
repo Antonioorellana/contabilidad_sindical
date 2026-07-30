@@ -2,6 +2,11 @@ const MAX_FILE_SIZE_BYTES = 25 * 1024 * 1024;
 
 const ALLOWED_EXTENSIONS = new Set(["xlsx", "csv", "xls", "pdf"]);
 
+export interface MaterializedImportFile {
+  file: File;
+  sha256: string;
+}
+
 /**
  * Validates the local file before reading or uploading it.
  *
@@ -32,6 +37,67 @@ export function validateImportFile(file: File): void {
  */
 export async function calculateSha256(file: File): Promise<string> {
   const bytes = await file.arrayBuffer();
+  return calculateBytesSha256(bytes);
+}
+
+/**
+ * Copies a selected file into browser-owned memory before any lazy parsing or
+ * network request can invalidate a cloud-provider file reference.
+ *
+ * @param sourceFile - File reference returned by the operating-system picker.
+ * @returns Durable in-memory file and the SHA-256 of the captured bytes.
+ * @throws Error when the browser cannot acquire the complete file contents.
+ */
+export async function materializeImportFile(
+  sourceFile: File,
+): Promise<MaterializedImportFile> {
+  validateImportFile(sourceFile);
+
+  let bytes: ArrayBuffer;
+  try {
+    bytes = await sourceFile.arrayBuffer();
+  } catch (error) {
+    throw new Error(getFileReadErrorMessage(error), { cause: error });
+  }
+
+  if (bytes.byteLength !== sourceFile.size) {
+    throw new Error(
+      "El archivo no terminó de descargarse desde OneDrive. Guárdalo localmente y selecciónalo nuevamente.",
+    );
+  }
+
+  return {
+    file: new File([bytes], sourceFile.name, {
+      type: sourceFile.type,
+      lastModified: sourceFile.lastModified,
+    }),
+    sha256: await calculateBytesSha256(bytes),
+  };
+}
+
+/**
+ * Detects browser and macOS file-provider read failures without exposing raw
+ * platform messages to the user.
+ *
+ * @param error - Error raised while acquiring file bytes.
+ * @returns Localized recovery guidance.
+ */
+export function getFileReadErrorMessage(error: unknown): string {
+  const message = error instanceof Error ? error.message.toLowerCase() : "";
+  const name = error instanceof Error ? error.name.toLowerCase() : "";
+  const isUnavailableReference =
+    name.includes("notreadable") ||
+    name.includes("security") ||
+    message.includes("could not be read") ||
+    message.includes("permission") ||
+    message.includes("reference to a file");
+
+  return isUnavailableReference
+    ? "El navegador perdió acceso al archivo de OneDrive. Descárgalo o marca “Mantener siempre en este dispositivo” y vuelve a seleccionarlo."
+    : "No fue posible leer el archivo completo. Vuelve a seleccionarlo desde una carpeta local.";
+}
+
+async function calculateBytesSha256(bytes: ArrayBuffer): Promise<string> {
   const digest = await crypto.subtle.digest("SHA-256", bytes);
 
   return Array.from(new Uint8Array(digest), (byte) =>

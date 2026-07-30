@@ -8,10 +8,16 @@ import {
   Upload,
   X,
 } from "lucide-react";
-import { useEffect, useState, type ChangeEvent, type FormEvent } from "react";
+import {
+  useEffect,
+  useRef,
+  useState,
+  type ChangeEvent,
+  type FormEvent,
+} from "react";
 import { parseImportFile } from "./spreadsheetParser";
 import { uploadMonthlyFile } from "./importService";
-import { validateImportFile } from "./fileIntegrity";
+import { materializeImportFile } from "./fileIntegrity";
 import type {
   MonthlyCycle,
   ParsedImportFile,
@@ -70,10 +76,12 @@ export function UploadDialog({
   const [kind, setKind] = useState<SourceFileKind>(initialKind);
   const [providerId, setProviderId] = useState("");
   const [file, setFile] = useState<File | null>(null);
+  const [sha256, setSha256] = useState<string | null>(null);
   const [parsed, setParsed] = useState<ParsedImportFile | null>(null);
   const [isParsing, setIsParsing] = useState(false);
   const [isUploading, setIsUploading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const inspectionSequence = useRef(0);
 
   useEffect(() => {
     const closeOnEscape = (event: KeyboardEvent) => {
@@ -86,27 +94,69 @@ export function UploadDialog({
     return () => window.removeEventListener("keydown", closeOnEscape);
   }, [isUploading, onClose]);
 
-  const inspectFile = async (selectedFile: File, selectedKind: SourceFileKind) => {
+  useEffect(
+    () => () => {
+      inspectionSequence.current += 1;
+    },
+    [],
+  );
+
+  const inspectFile = async (
+    durableFile: File,
+    selectedKind: SourceFileKind,
+    inspectionId: number,
+  ) => {
     setIsParsing(true);
     setError(null);
     setParsed(null);
 
     try {
-      validateImportFile(selectedFile);
-      setParsed(await parseImportFile(selectedFile, selectedKind));
+      const nextParsed = await parseImportFile(durableFile, selectedKind);
+      if (inspectionId === inspectionSequence.current) {
+        setParsed(nextParsed);
+      }
     } catch (caughtError) {
-      setError(toErrorMessage(caughtError));
+      if (inspectionId === inspectionSequence.current) {
+        setError(toErrorMessage(caughtError));
+      }
     } finally {
-      setIsParsing(false);
+      if (inspectionId === inspectionSequence.current) {
+        setIsParsing(false);
+      }
     }
   };
 
   const handleFileChange = (event: ChangeEvent<HTMLInputElement>) => {
-    const selectedFile = event.target.files?.[0] ?? null;
-    setFile(selectedFile);
-    if (selectedFile) {
-      void inspectFile(selectedFile, kind);
+    const selectedFile = event.currentTarget.files?.[0] ?? null;
+    event.currentTarget.value = "";
+
+    if (!selectedFile) {
+      return;
     }
+
+    const inspectionId = ++inspectionSequence.current;
+    setFile(null);
+    setSha256(null);
+    setParsed(null);
+    setError(null);
+    setIsParsing(true);
+
+    void materializeImportFile(selectedFile)
+      .then(({ file: durableFile, sha256: capturedSha256 }) => {
+        if (inspectionId !== inspectionSequence.current) {
+          return;
+        }
+
+        setFile(durableFile);
+        setSha256(capturedSha256);
+        return inspectFile(durableFile, kind, inspectionId);
+      })
+      .catch((caughtError: unknown) => {
+        if (inspectionId === inspectionSequence.current) {
+          setError(toErrorMessage(caughtError));
+          setIsParsing(false);
+        }
+      });
   };
 
   const handleKindChange = (nextKind: SourceFileKind) => {
@@ -114,14 +164,15 @@ export function UploadDialog({
     if (nextKind !== "provider_plan") {
       setProviderId("");
     }
-    if (file) {
-      void inspectFile(file, nextKind);
+    if (file && sha256) {
+      const inspectionId = ++inspectionSequence.current;
+      void inspectFile(file, nextKind, inspectionId);
     }
   };
 
   const submit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
-    if (!file || !parsed || isUploading) {
+    if (!file || !sha256 || !parsed || isUploading) {
       return;
     }
 
@@ -134,6 +185,7 @@ export function UploadDialog({
         providerId: kind === "provider_plan" ? providerId || null : null,
         kind,
         file,
+        sha256,
         parsed,
       });
       await onCompleted();
@@ -191,7 +243,7 @@ export function UploadDialog({
                   value={sourceKind.value}
                   checked={kind === sourceKind.value}
                   onChange={() => handleKindChange(sourceKind.value)}
-                  disabled={isUploading}
+                  disabled={isUploading || isParsing}
                 />
                 <span>
                   <strong>{sourceKind.label}</strong>
@@ -288,6 +340,7 @@ export function UploadDialog({
               type="submit"
               disabled={
                 !file ||
+                !sha256 ||
                 !parsed ||
                 isParsing ||
                 isUploading ||

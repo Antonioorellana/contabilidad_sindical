@@ -1,6 +1,8 @@
 import { describe, expect, it } from "vitest";
 import {
   calculateSha256,
+  getFileReadErrorMessage,
+  materializeImportFile,
   sanitizeFileName,
   validateImportFile,
 } from "./fileIntegrity";
@@ -26,5 +28,31 @@ describe("file integrity", () => {
     const file = new File(["x"], "script.html", { type: "text/html" });
 
     expect(() => validateImportFile(file)).toThrow("Formato no permitido");
+  });
+
+  it("crea una copia independiente controlada por el navegador", async () => {
+    const source = new File(["datos sindicales"], "origen.xlsx", {
+      type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+      lastModified: 1234,
+    });
+
+    const materialized = await materializeImportFile(source);
+
+    expect(materialized.file).not.toBe(source);
+    expect(materialized.file.name).toBe(source.name);
+    expect(materialized.file.lastModified).toBe(source.lastModified);
+    expect(await materialized.file.text()).toBe("datos sindicales");
+    expect(materialized.sha256).toBe(await calculateSha256(source));
+  });
+
+  it("explica los errores de permisos de proveedores cloud", () => {
+    expect(
+      getFileReadErrorMessage(
+        new DOMException(
+          "The requested file could not be read after a reference to a file was acquired.",
+          "NotReadableError",
+        ),
+      ),
+    ).toContain("OneDrive");
   });
 });
