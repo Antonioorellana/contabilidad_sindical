@@ -39,14 +39,17 @@
    ExcelJS while its production dependency chain reports high vulnerabilities.
 
 ## Execution & Validation
-1. **[2026-07-29] Validate the production artifact**
+1. **[2026-07-30] Supabase Free throttles authentication email**
+   Do instead: surface `over_email_send_rate_limit` as a temporary one-hour
+   wait and avoid repeated resend attempts that extend user confusion.
+2. **[2026-07-29] Validate the production artifact**
    Do instead: run lint, TypeScript build, production dependency audit and a
    browser smoke test before publishing.
-2. **[2026-07-29] Repair migration history before the first CLI push**
+3. **[2026-07-29] Repair migration history before the first CLI push**
    Do instead: mark `202607290001`, `202607290002` and `202607290003` as
    applied when linking the Supabase CLI because they were executed manually
    in the SQL Editor.
-3. **[2026-07-29] Ignore stale inherited GitHub tokens**
+4. **[2026-07-29] Ignore stale inherited GitHub tokens**
    Do instead: run GitHub operations with empty `GH_TOKEN` and `GITHUB_TOKEN`
    so the authenticated keyring credential is used.
 

@@ -7,7 +7,7 @@ import {
   ShieldCheck,
 } from "lucide-react";
 import { supabase } from "../../lib/supabase";
-import { getAuthRedirectError } from "./authFeedback";
+import { getAuthRedirectError, getAuthRequestError } from "./authFeedback";
 import { useAuth, type AuthenticatedOfficer } from "./useAuth";
 
 interface AuthGateProps {
@@ -60,7 +60,7 @@ export function AuthGate({ children }: AuthGateProps) {
     setIsWorking(false);
 
     if (error) {
-      setMessage("La cuenta no existe o no fue posible enviar el enlace.");
+      setMessage(getAuthRequestError(error.code));
       return;
     }
 
