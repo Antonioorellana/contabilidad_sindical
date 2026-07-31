@@ -15,8 +15,9 @@ El proyecto remoto Free está operativo en la región `sa-east-1`.
 
 ## Estado del proyecto remoto
 
-Las migraciones `202607290001`, `202607290002`, `202607290003` y
-`202607300001` se aplicaron manualmente mediante SQL Editor. Antes del primer
+Las migraciones `202607290001`, `202607290002`, `202607290003`,
+`202607300001`, `202607300002`, `202607300003` y `202607310001` se aplicaron
+manualmente mediante SQL Editor. Antes del primer
 `supabase db push` debe repararse el historial del CLI para marcarlas como
 aplicadas y evitar que se intenten ejecutar por segunda vez.
 
@@ -37,6 +38,9 @@ Pendientes:
    supabase migration repair 202607290002 --status applied
    supabase migration repair 202607290003 --status applied
    supabase migration repair 202607300001 --status applied
+   supabase migration repair 202607300002 --status applied
+   supabase migration repair 202607300003 --status applied
+   supabase migration repair 202607310001 --status applied
    ```
 
 Las variables públicas ya están configuradas localmente y en Vercel. No deben
@@ -63,3 +67,14 @@ values
 ```
 
 No se deben usar UUID de ejemplo en producción.
+
+## Padrón mensual y descarte seguro
+
+- `preview_member_roster_sync` calcula altas, reactivaciones, cambios de nombre e
+  inactivaciones antes de modificar el padrón.
+- `apply_member_roster_sync` exige confirmación del número de inactivaciones y
+  rechaza una nómina anormalmente pequeña.
+- `supersede_import_batch` excluye una carga del cálculo, pero conserva el original,
+  la huella SHA-256, las filas y el motivo auditado.
+- El resultado de cuota social por $8.000 es la única fuente autoritativa del padrón
+  activo mensual; no se infiere desde convenios ni desde depósitos bancarios.

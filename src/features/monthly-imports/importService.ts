@@ -8,6 +8,8 @@ import type {
   ImportBatchSummary,
   ImportReviewPage,
   ImportReviewQuery,
+  MemberRosterPreview,
+  MemberRosterSyncResult,
   MonthlyCycle,
   Provider,
   UploadRequest,
@@ -48,6 +50,8 @@ export async function loadMonthlyContext(cycleId?: string): Promise<MonthlyConte
       detected_total,
       error_summary,
       processed_at,
+      superseded_at,
+      superseded_reason,
       source_files!inner (
         id,
         original_name,
@@ -88,6 +92,86 @@ export async function loadMonthlyContext(cycleId?: string): Promise<MonthlyConte
     providers: (providersResult.data ?? []) as Provider[],
     batches: (batchesResult.data ?? []) as unknown as ImportBatchSummary[],
   };
+}
+
+/**
+ * Previews the exact effect of using one Jumbo result as the active roster.
+ *
+ * @param importBatchId Processed company-result batch.
+ * @returns Counts that must be reviewed before applying the roster.
+ */
+export async function previewMemberRosterSync(
+  importBatchId: string,
+): Promise<MemberRosterPreview> {
+  const client = requireSupabase();
+  const { data, error } = await client.rpc("preview_member_roster_sync", {
+    p_import_batch_id: importBatchId,
+  });
+
+  if (error) {
+    throw new Error(`No fue posible preparar el padrón: ${error.message}`);
+  }
+
+  const preview = Array.isArray(data) ? data[0] : data;
+  if (!preview) {
+    throw new Error("La carga no contiene una nómina social válida.");
+  }
+
+  return preview as MemberRosterPreview;
+}
+
+/**
+ * Applies a previously reviewed roster preview with an optimistic safety check.
+ *
+ * @param importBatchId Processed company-result batch.
+ * @param expectedInactivatedMembers Count confirmed by the treasurer.
+ * @returns Auditable roster synchronization record.
+ */
+export async function applyMemberRosterSync(
+  importBatchId: string,
+  expectedInactivatedMembers: number,
+): Promise<MemberRosterSyncResult> {
+  const client = requireSupabase();
+  const { data, error } = await client.rpc("apply_member_roster_sync", {
+    p_import_batch_id: importBatchId,
+    p_expected_inactivated_members: expectedInactivatedMembers,
+  });
+
+  if (error) {
+    throw new Error(`No fue posible actualizar el padrón: ${error.message}`);
+  }
+
+  if (!data) {
+    throw new Error("La base de datos no confirmó la actualización del padrón.");
+  }
+
+  return data as MemberRosterSyncResult;
+}
+
+/**
+ * Excludes a source batch from calculations while preserving its immutable evidence.
+ *
+ * @param importBatchId Batch to supersede.
+ * @param reason Human-authored audit reason.
+ */
+export async function supersedeImportBatch(
+  importBatchId: string,
+  reason: string,
+): Promise<void> {
+  const client = requireSupabase();
+  const normalizedReason = reason.trim();
+  if (normalizedReason.length < 5 || normalizedReason.length > 500) {
+    throw new Error("Indica un motivo de entre 5 y 500 caracteres.");
+  }
+
+  const { error } = await client.rpc("supersede_import_batch", {
+    p_import_batch_id: importBatchId,
+    p_reason: normalizedReason,
+  });
+
+  if (error) {
+    throw new Error(`No fue posible descartar la carga: ${error.message}`);
+  }
 }
 
 /**

@@ -5,8 +5,11 @@ Administradora Norte de Copiapó.
 
 ## Estado
 
-La pantalla de inicio todavía utiliza cifras demostrativas. El módulo de cargas
-mensuales ya está conectado al proyecto remoto de Supabase y permite:
+La aplicación ya no muestra cifras demostrativas. Inicio, cargas mensuales,
+cuentas de socios y conciliación consultan exclusivamente datos persistidos en
+Supabase. Los módulos todavía no implementados muestran un estado vacío explícito.
+
+El circuito operativo actual permite:
 
 - acceso sin registro público mediante enlace temporal;
 - creación de ciclos de descuento y recaudación;
@@ -14,6 +17,10 @@ mensuales ya está conectado al proyecto remoto de Supabase y permite:
 - archivo privado de XLS, PDF, XLSX y CSV;
 - huella SHA-256 e inmutabilidad del original;
 - staging de filas ambiguas para revisión manual;
+- actualización confirmada del padrón desde la hoja real de cuota social de Jumbo;
+- descarte auditable de cargas sin eliminar evidencia;
+- consulta del padrón por activos, inactivos, revisión o todos;
+- tablero real con socios, montos informados, observaciones y fuentes disponibles;
 - separación entre prevalidación y contabilización.
 
 ## Tecnologías

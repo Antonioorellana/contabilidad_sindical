@@ -1,6 +1,7 @@
 import {
   AlertTriangle,
   Archive,
+  Ban,
   CalendarDays,
   CheckCircle2,
   FileSpreadsheet,
@@ -9,10 +10,15 @@ import {
   LockKeyhole,
   Plus,
   Upload,
+  UserRoundCheck,
 } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
 import type { OfficerRole } from "../auth/useAuth";
 import { ImportReviewPanel } from "./ImportReviewPanel";
+import {
+  RosterSyncDialog,
+  SupersedeImportDialog,
+} from "./ImportManagementDialogs";
 import { createMonthlyCycle, loadMonthlyContext } from "./importService";
 import type {
   ImportBatchSummary,
@@ -56,6 +62,8 @@ export function MonthlyImportsPage({
   const [isUploadOpen, setIsUploadOpen] = useState(false);
   const [newPeriod, setNewPeriod] = useState("2026-07");
   const [error, setError] = useState<string | null>(null);
+  const [rosterBatch, setRosterBatch] = useState<ImportBatchSummary | null>(null);
+  const [supersedeBatch, setSupersedeBatch] = useState<ImportBatchSummary | null>(null);
 
   const refresh = useCallback(async (cycleId?: string) => {
     setIsLoading(true);
@@ -111,9 +119,10 @@ export function MonthlyImportsPage({
   };
 
   const selectedCycle = cycles.find((cycle) => cycle.id === selectedCycleId) ?? null;
-  const reviewRows = batches.reduce((total, batch) => total + batch.rejected_rows, 0);
-  const readyRows = batches.reduce((total, batch) => total + batch.accepted_rows, 0);
-  const detectedTotal = batches.reduce(
+  const activeBatches = batches.filter((batch) => batch.status !== "superseded");
+  const reviewRows = activeBatches.reduce((total, batch) => total + batch.rejected_rows, 0);
+  const readyRows = activeBatches.reduce((total, batch) => total + batch.accepted_rows, 0);
+  const detectedTotal = activeBatches.reduce(
     (total, batch) => total + (batch.detected_total ?? 0),
     0,
   );
@@ -274,6 +283,9 @@ export function MonthlyImportsPage({
                 batch={batch}
                 isSelected={batch.id === selectedBatchId}
                 onReview={openBatchReview}
+                canManage={role === "treasurer"}
+                onRosterSync={setRosterBatch}
+                onSupersede={setSupersedeBatch}
               />
             ))}
           </div>
@@ -296,6 +308,22 @@ export function MonthlyImportsPage({
           onCompleted={() => refresh(selectedCycle.id)}
         />
       ) : null}
+
+      {rosterBatch ? (
+        <RosterSyncDialog
+          batch={rosterBatch}
+          onClose={() => setRosterBatch(null)}
+          onCompleted={() => refresh(selectedCycleId || undefined)}
+        />
+      ) : null}
+
+      {supersedeBatch ? (
+        <SupersedeImportDialog
+          batch={supersedeBatch}
+          onClose={() => setSupersedeBatch(null)}
+          onCompleted={() => refresh(selectedCycleId || undefined)}
+        />
+      ) : null}
     </div>
   );
 }
@@ -304,16 +332,25 @@ function ImportBatchRow({
   batch,
   isSelected,
   onReview,
+  canManage,
+  onRosterSync,
+  onSupersede,
 }: {
   batch: ImportBatchSummary;
   isSelected: boolean;
   onReview: (batchId: string) => void;
+  canManage: boolean;
+  onRosterSync: (batch: ImportBatchSummary) => void;
+  onSupersede: (batch: ImportBatchSummary) => void;
 }) {
   const source = batch.source_files;
   const archivedOnly = batch.status === "uploaded" && batch.detected_rows === 0;
+  const isSuperseded = batch.status === "superseded";
+  const canSyncRoster =
+    canManage && source?.kind === "company_result" && batch.status === "processed";
 
   return (
-    <article className={`import-row ${isSelected ? "selected" : ""}`}>
+    <article className={`import-row ${isSelected ? "selected" : ""} ${isSuperseded ? "superseded" : ""}`}>
       <span className={`file-icon ${batch.rejected_rows > 0 ? "warning" : ""}`}>
         {archivedOnly ? <Archive size={18} /> : <FileSpreadsheet size={18} />}
       </span>
@@ -334,8 +371,10 @@ function ImportBatchRow({
         </strong>
       </div>
       <div className="batch-actions">
-        <span className={`batch-status ${batch.rejected_rows > 0 ? "review" : "safe"}`}>
-          {archivedOnly
+        <span className={`batch-status ${isSuperseded ? "discarded" : batch.rejected_rows > 0 ? "review" : "safe"}`}>
+          {isSuperseded
+            ? "Descartado"
+            : archivedOnly
             ? "Archivado"
             : batch.rejected_rows > 0
               ? "Revisión manual"
@@ -351,7 +390,32 @@ function ImportBatchRow({
             Ver filas
           </button>
         ) : null}
+        {canSyncRoster ? (
+          <button
+            className="review-link roster-link"
+            type="button"
+            onClick={() => onRosterSync(batch)}
+          >
+            <UserRoundCheck size={15} />
+            Actualizar padrón
+          </button>
+        ) : null}
+        {canManage && !isSuperseded ? (
+          <button
+            className="review-link discard-link"
+            type="button"
+            onClick={() => onSupersede(batch)}
+          >
+            <Ban size={15} />
+            Descartar
+          </button>
+        ) : null}
       </div>
+      {isSuperseded && batch.superseded_reason ? (
+        <div className="discard-reason" title={batch.superseded_reason}>
+          Motivo: {batch.superseded_reason}
+        </div>
+      ) : null}
     </article>
   );
 }

@@ -35,6 +35,8 @@ export interface ImportBatchSummary {
   detected_total: number | null;
   error_summary: Array<{ code: string; count: number }>;
   processed_at: string | null;
+  superseded_at: string | null;
+  superseded_reason: string | null;
   source_files: {
     id: string;
     original_name: string;
@@ -43,6 +45,30 @@ export interface ImportBatchSummary {
     sha256: string;
     provider_id: string | null;
   } | null;
+}
+
+export interface MemberRosterPreview {
+  import_batch_id: string;
+  source_file_name: string;
+  discount_period: string;
+  roster_rows: number;
+  new_members: number;
+  reactivated_members: number;
+  renamed_members: number;
+  inactivated_members: number;
+  already_applied: boolean;
+}
+
+export interface MemberRosterSyncResult {
+  id: string;
+  import_batch_id: string;
+  discount_period: string;
+  roster_rows: number;
+  new_members: number;
+  reactivated_members: number;
+  renamed_members: number;
+  inactivated_members: number;
+  synced_at: string;
 }
 
 export interface StagedImportRow {

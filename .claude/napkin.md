@@ -10,13 +10,19 @@
 1. **[2026-07-29] Never distribute a mismatched consolidated discount**
    Do instead: distribute automatically only when the company total exactly
    equals the requested installments; otherwise create a manual-review alert.
-2. **[2026-07-29] Discount and collection are different periods**
+2. **[2026-07-31] Never infer debt from Jumbo's consolidated result**
+   Do instead: show payroll deductions as evidence, but calculate debt and
+   upcoming installments only from canonical provider operations and quotas.
+3. **[2026-07-31] The $8,000 sheet is the active-member authority**
+   Do instead: bootstrap and refresh the active roster from valid social-fee
+   rows, preserving unknown admission dates as null.
+4. **[2026-07-29] Discount and collection are different periods**
    Do instead: persist both the payroll discount period and the following
    collection/deposit period on every monthly cycle.
-3. **[2026-07-29] Financial records are immutable after confirmation**
+5. **[2026-07-29] Financial records are immutable after confirmation**
    Do instead: reverse or adjust confirmed records with reason, actor and
    timestamp; never physically delete them.
-4. **[2026-07-29] Preserve every imported source**
+6. **[2026-07-29] Preserve every imported source**
    Do instead: store the original file, SHA-256 hash, uploader and upload time
    before parsing or normalizing its rows.
 
@@ -55,10 +61,10 @@
 5. **[2026-07-29] Validate the production artifact**
    Do instead: run lint, TypeScript build, production dependency audit and a
    browser smoke test before publishing.
-6. **[2026-07-29] Repair migration history before the first CLI push**
-   Do instead: mark `202607290001`, `202607290002`, `202607290003` and
-   `202607300001` as applied when linking the Supabase CLI because they were
-   executed manually in the SQL Editor.
+6. **[2026-07-31] Repair migration history before the first CLI push**
+   Do instead: mark `202607290001`, `202607290002`, `202607290003`,
+   `202607300001`, `202607300002`, `202607300003` and `202607310001` as applied
+   when linking the Supabase CLI because they were executed manually in the SQL Editor.
 7. **[2026-07-29] Ignore stale inherited GitHub tokens**
    Do instead: run GitHub operations with empty `GH_TOKEN` and `GITHUB_TOKEN`
    so the authenticated keyring credential is used.
@@ -70,3 +76,6 @@
 2. **[2026-07-29] Two-month pilot**
    Do instead: support July and August 2026 legacy sheets and manual correction;
    expect standardized provider sheets from September 2026.
+3. **[2026-07-31] Separate real modules from demo screens**
+   Do instead: clearly label or replace dashboard placeholders; never present
+   demo balances, Drive status or alerts as production accounting data.

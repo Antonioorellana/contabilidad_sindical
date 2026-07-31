@@ -27,6 +27,7 @@ import type {
   MemberAccount,
   MemberDirectoryItem,
   MemberLedgerState,
+  MemberStatusFilter,
 } from "./types";
 
 interface MemberAccountsPageProps {
@@ -56,6 +57,7 @@ export function MemberAccountsPage({
   const [members, setMembers] = useState<MemberDirectoryItem[]>([]);
   const [directoryTotal, setDirectoryTotal] = useState(0);
   const [selectedMemberId, setSelectedMemberId] = useState("");
+  const [statusFilter, setStatusFilter] = useState<MemberStatusFilter>("active");
   const [account, setAccount] = useState<MemberAccount | null>(null);
   const [isDirectoryLoading, setIsDirectoryLoading] = useState(true);
   const [isAccountLoading, setIsAccountLoading] = useState(false);
@@ -67,7 +69,7 @@ export function MemberAccountsPage({
     setIsDirectoryLoading(true);
     setDirectoryError(null);
 
-    void loadMemberDirectory(deferredSearch)
+    void loadMemberDirectory(deferredSearch, statusFilter)
       .then(({ members: nextMembers, total }) => {
         if (!isCurrent) {
           return;
@@ -99,7 +101,7 @@ export function MemberAccountsPage({
     return () => {
       isCurrent = false;
     };
-  }, [deferredSearch]);
+  }, [deferredSearch, statusFilter]);
 
   useEffect(() => {
     if (!selectedMemberId) {
@@ -148,7 +150,9 @@ export function MemberAccountsPage({
           <Users size={18} />
           <div>
             <strong>{directoryTotal}</strong>
-            <span>{deferredSearch ? "coincidencias" : "socios registrados"}</span>
+            <span>
+              {deferredSearch ? "coincidencias" : translateFilter(statusFilter)}
+            </span>
           </div>
         </div>
       </section>
@@ -167,6 +171,21 @@ export function MemberAccountsPage({
         ) : (
           <kbd>⌘ K</kbd>
         )}
+        <label className="member-status-filter">
+          <span className="sr-only">Filtrar padrón por estado</span>
+          <select
+            value={statusFilter}
+            onChange={(event) =>
+              setStatusFilter(event.target.value as MemberStatusFilter)
+            }
+            aria-label="Filtrar padrón por estado"
+          >
+            <option value="active">Activos</option>
+            <option value="inactive">Inactivos</option>
+            <option value="review">Por revisar</option>
+            <option value="all">Todos</option>
+          </select>
+        </label>
       </section>
 
       {role === "president" ? (
@@ -499,6 +518,16 @@ function translateMovementState(state: MemberLedgerState): string {
     "manual-review": "Por revisar",
   };
   return labels[state];
+}
+
+function translateFilter(filter: MemberStatusFilter): string {
+  const labels: Record<MemberStatusFilter, string> = {
+    active: "socios activos",
+    inactive: "socios inactivos",
+    review: "socios por revisar",
+    all: "socios registrados",
+  };
+  return labels[filter];
 }
 
 function translateOperationStatus(

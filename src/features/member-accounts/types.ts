@@ -18,6 +18,8 @@ export interface MemberDirectoryPage {
   total: number;
 }
 
+export type MemberStatusFilter = "active" | "inactive" | "review" | "all";
+
 export interface MemberStagedMovement {
   id: string;
   amount: number | null;

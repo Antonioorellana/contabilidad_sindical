@@ -5,6 +5,7 @@ import type {
   MemberAgreementOperation,
   MemberDirectoryItem,
   MemberDirectoryPage,
+  MemberStatusFilter,
   MemberStagedMovement,
 } from "./types";
 
@@ -18,6 +19,7 @@ const DIRECTORY_LIMIT = 60;
  */
 export async function loadMemberDirectory(
   rawSearch: string,
+  status: MemberStatusFilter = "active",
 ): Promise<MemberDirectoryPage> {
   const client = requireSupabase();
   let query = client
@@ -28,6 +30,10 @@ export async function loadMemberDirectory(
     .order("full_name", { ascending: true })
     .limit(DIRECTORY_LIMIT);
   const searchFilter = buildMemberSearchFilter(rawSearch);
+
+  if (status !== "all") {
+    query = query.eq("status", status);
+  }
 
   if (searchFilter) {
     query = query.or(searchFilter);
