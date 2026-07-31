@@ -31,6 +31,7 @@ import {
 } from "lucide-react";
 import { AuthGate } from "./features/auth/AuthGate";
 import type { AuthenticatedOfficer } from "./features/auth/useAuth";
+import { MemberAccountsPage } from "./features/member-accounts/MemberAccountsPage";
 import { MonthlyImportsPage } from "./features/monthly-imports/MonthlyImportsPage";
 import { ReconciliationPage } from "./features/reconciliation/ReconciliationPage";
 import { supabase } from "./lib/supabase";
@@ -47,6 +48,7 @@ const money = new Intl.NumberFormat("es-CL", {
 const navigation: Array<{ label: string; icon: Icon }> = [
   { label: "Inicio", icon: LayoutDashboard },
   { label: "Cargas mensuales", icon: ArrowDownToLine },
+  { label: "Cuentas de socios", icon: Users },
   { label: "Conciliación", icon: ShieldCheck },
   { label: "Convenios", icon: Handshake },
   { label: "Ingresos y egresos", icon: WalletCards },
@@ -137,6 +139,7 @@ function Application({ officer }: { officer: AuthenticatedOfficer }) {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [openUploadSignal, setOpenUploadSignal] = useState(0);
   const [importSearch, setImportSearch] = useState("");
+  const [memberSearch, setMemberSearch] = useState("");
   const searchInputRef = useRef<HTMLInputElement>(null);
   const initials = officer.displayName
     .split(/\s+/)
@@ -150,7 +153,7 @@ function Application({ officer }: { officer: AuthenticatedOfficer }) {
     const focusSearch = (event: KeyboardEvent) => {
       if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === "k") {
         event.preventDefault();
-        setActive("Cargas mensuales");
+        setActive("Cuentas de socios");
         searchInputRef.current?.focus();
       }
     };
@@ -221,11 +224,11 @@ function Application({ officer }: { officer: AuthenticatedOfficer }) {
             <input
               ref={searchInputRef}
               aria-label="Buscar socio por RUT o nombre"
-              placeholder="Buscar RUT o nombre en cargas"
-              value={importSearch}
+              placeholder="Buscar socio por RUT o nombre"
+              value={memberSearch}
               onChange={(event) => {
-                setImportSearch(event.target.value);
-                setActive("Cargas mensuales");
+                setMemberSearch(event.target.value);
+                setActive("Cuentas de socios");
               }}
             />
             <kbd>⌘ K</kbd>
@@ -254,6 +257,12 @@ function Application({ officer }: { officer: AuthenticatedOfficer }) {
             openUploadSignal={openUploadSignal}
             searchQuery={importSearch}
             onSearchQueryChange={setImportSearch}
+          />
+        ) : active === "Cuentas de socios" ? (
+          <MemberAccountsPage
+            role={officer.role}
+            searchQuery={memberSearch}
+            onSearchQueryChange={setMemberSearch}
           />
         ) : active === "Conciliación" ? (
           <ReconciliationPage
