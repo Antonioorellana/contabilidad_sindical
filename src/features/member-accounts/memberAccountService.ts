@@ -4,6 +4,7 @@ import type {
   MemberAccount,
   MemberAgreementOperation,
   MemberDirectoryItem,
+  MemberDirectoryPage,
   MemberStagedMovement,
 } from "./types";
 
@@ -13,15 +14,17 @@ const DIRECTORY_LIMIT = 60;
  * Loads a bounded officer-only member directory.
  *
  * @param rawSearch Optional RUT or name fragment.
- * @returns Up to 60 matching members ordered by name.
+ * @returns Matching count and up to 60 members ordered by name.
  */
 export async function loadMemberDirectory(
   rawSearch: string,
-): Promise<MemberDirectoryItem[]> {
+): Promise<MemberDirectoryPage> {
   const client = requireSupabase();
   let query = client
     .from("members")
-    .select("id,rut,full_name,status,authorized_on,inactive_on")
+    .select("id,rut,full_name,status,authorized_on,inactive_on", {
+      count: "exact",
+    })
     .order("full_name", { ascending: true })
     .limit(DIRECTORY_LIMIT);
   const searchFilter = buildMemberSearchFilter(rawSearch);
@@ -30,12 +33,15 @@ export async function loadMemberDirectory(
     query = query.or(searchFilter);
   }
 
-  const { data, error } = await query;
+  const { count, data, error } = await query;
   if (error) {
     throw new Error(`No fue posible buscar socios: ${error.message}`);
   }
 
-  return (data ?? []) as MemberDirectoryItem[];
+  return {
+    members: (data ?? []) as MemberDirectoryItem[],
+    total: count ?? 0,
+  };
 }
 
 /**

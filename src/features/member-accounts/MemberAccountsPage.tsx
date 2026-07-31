@@ -54,6 +54,7 @@ export function MemberAccountsPage({
 }: MemberAccountsPageProps) {
   const deferredSearch = useDebouncedValue(searchQuery, 250);
   const [members, setMembers] = useState<MemberDirectoryItem[]>([]);
+  const [directoryTotal, setDirectoryTotal] = useState(0);
   const [selectedMemberId, setSelectedMemberId] = useState("");
   const [account, setAccount] = useState<MemberAccount | null>(null);
   const [isDirectoryLoading, setIsDirectoryLoading] = useState(true);
@@ -67,12 +68,13 @@ export function MemberAccountsPage({
     setDirectoryError(null);
 
     void loadMemberDirectory(deferredSearch)
-      .then((nextMembers) => {
+      .then(({ members: nextMembers, total }) => {
         if (!isCurrent) {
           return;
         }
 
         setMembers(nextMembers);
+        setDirectoryTotal(total);
         setSelectedMemberId((current) => {
           if (nextMembers.some((member) => member.id === current)) {
             return current;
@@ -83,6 +85,7 @@ export function MemberAccountsPage({
       .catch((error: unknown) => {
         if (isCurrent) {
           setMembers([]);
+          setDirectoryTotal(0);
           setSelectedMemberId("");
           setDirectoryError(toErrorMessage(error));
         }
@@ -131,10 +134,6 @@ export function MemberAccountsPage({
     };
   }, [selectedMemberId]);
 
-  const activeMembers = members.filter(
-    (member) => member.status === "active",
-  ).length;
-
   return (
     <div className="content member-accounts-content">
       <section className="page-heading">
@@ -148,8 +147,8 @@ export function MemberAccountsPage({
         <div className="directory-count glass">
           <Users size={18} />
           <div>
-            <strong>{activeMembers}</strong>
-            <span>activos en esta vista</span>
+            <strong>{directoryTotal}</strong>
+            <span>{deferredSearch ? "coincidencias" : "socios registrados"}</span>
           </div>
         </div>
       </section>
@@ -192,7 +191,7 @@ export function MemberAccountsPage({
               <div className="eyebrow">Padrón</div>
               <h2>Socios encontrados</h2>
             </div>
-            <span className="directory-result-count">{members.length}</span>
+            <span className="directory-result-count">{directoryTotal}</span>
           </div>
 
           <div className="member-directory-list">

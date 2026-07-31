@@ -13,6 +13,11 @@ export interface MemberDirectoryItem {
   inactive_on: string | null;
 }
 
+export interface MemberDirectoryPage {
+  members: MemberDirectoryItem[];
+  total: number;
+}
+
 export interface MemberStagedMovement {
   id: string;
   amount: number | null;
